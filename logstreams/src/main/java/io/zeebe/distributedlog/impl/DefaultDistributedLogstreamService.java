@@ -206,17 +206,24 @@ public class DefaultDistributedLogstreamService
       return 1; // Assume the append was successful because event was previously appended.
     }
 
-    final ByteBuffer buffer = ByteBuffer.wrap(blockBuffer);
-    final long appendResult = logStorage.append(buffer);
-    if (appendResult > 0) {
-      updateCommitPosition(commitPosition);
-    } else {
-      logger.error("Append failed {}", appendResult);
+    final long appendResult;
+    try {
+      final ByteBuffer buffer = ByteBuffer.wrap(blockBuffer);
+      appendResult = logStorage.append(buffer);
+      if (appendResult > 0) {
+        updateCommitPosition(commitPosition);
+      } else {
+        logger.error("Append failed {}", appendResult);
+      }
+    } catch (RuntimeException e) {
+      logger.error("Append exceptionally failed", e);
+      throw e;
     }
+
     // the return result is valid only for the leader. If the followers failed to append, they don't
     // retry
     return appendResult;
-  }
+}
 
   @Override
   public boolean claimLeaderShip(String nodeId, long term) {
@@ -292,7 +299,7 @@ public class DefaultDistributedLogstreamService
     final SnapshotRestoreContext snapshotRestoreContext =
         restoreFactory.createSnapshotRestoreContext(partitionId, logger);
     final StateStorage storage = snapshotRestoreContext.getStateStorage();
-    final SnapshotConsumer snapshotConsumer = new FileSnapshotConsumer(storage, LOG);
+    final SnapshotConsumer snapshotConsumer = new FileSnapshotConsumer(storage, logger);
 
     final RestoreSnapshotReplicator snapshotReplicator =
         new RestoreSnapshotReplicator(
