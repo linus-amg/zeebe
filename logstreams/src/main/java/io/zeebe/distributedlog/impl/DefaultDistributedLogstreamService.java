@@ -202,7 +202,7 @@ public class DefaultDistributedLogstreamService
     if (commitPosition <= lastPosition) {
       // This case can happen due to raft-replay or when appender retries due to timeout or other
       // exceptions.
-      logger.trace("Rejecting append request at position {}", commitPosition);
+      logger.debug("Rejecting append request at position {}", commitPosition);
       return 1; // Assume the append was successful because event was previously appended.
     }
 
@@ -223,7 +223,7 @@ public class DefaultDistributedLogstreamService
     // the return result is valid only for the leader. If the followers failed to append, they don't
     // retry
     return appendResult;
-}
+  }
 
   @Override
   public boolean claimLeaderShip(String nodeId, long term) {

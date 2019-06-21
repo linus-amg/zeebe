@@ -23,10 +23,10 @@ public class DefaultRestoreInfoResponse implements RestoreInfoResponse {
   private ReplicationTarget replicationTarget;
   private SnapshotRestoreInfo snapshotRestoreInfo;
 
-  static final DefaultRestoreInfoResponse NONE =
-      new DefaultRestoreInfoResponse(ReplicationTarget.NONE);
   private static final NullSnapshotRestoreInfo NULL_SNAPSHOT_RESTORE_INFO =
       new NullSnapshotRestoreInfo();
+  static final DefaultRestoreInfoResponse NONE =
+      new DefaultRestoreInfoResponse(ReplicationTarget.NONE);
 
   public DefaultRestoreInfoResponse() {
     snapshotRestoreInfo = NULL_SNAPSHOT_RESTORE_INFO;
