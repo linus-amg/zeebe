@@ -58,8 +58,8 @@ public class RestoreController {
         new DefaultRestoreInfoRequest(latestLocalPosition, backupPosition);
 
     return findRestoreServer()
-        .thenCompose(server -> requestRestoreStrategy(server, request))
-        .thenCompose(RestoreStrategy::executeRestoreStrategy)
+        .thenComposeAsync(server -> requestRestoreStrategy(server, request), restoreThreadContext)
+        .thenComposeAsync(RestoreStrategy::executeRestoreStrategy, restoreThreadContext)
         .join();
   }
 
@@ -82,7 +82,8 @@ public class RestoreController {
       MemberId server, RestoreInfoRequest request) {
     return restoreClient
         .requestRestoreInfo(server, request)
-        .thenCompose(response -> onRestoreInfoReceived(server, request, response));
+        .thenComposeAsync(
+            response -> onRestoreInfoReceived(server, request, response), restoreThreadContext);
   }
 
   private CompletableFuture<RestoreStrategy> onRestoreInfoReceived(
