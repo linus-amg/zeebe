@@ -145,7 +145,8 @@ public class EngineService implements Service<EngineService> {
         processingContext,
         clusterCfg.getPartitionsCount(),
         subscriptionCommandSender,
-        deploymentDistributor);
+        deploymentDistributor,
+        atomix);
   }
 
   @Override

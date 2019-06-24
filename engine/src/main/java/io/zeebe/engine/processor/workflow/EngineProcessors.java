@@ -17,6 +17,7 @@
  */
 package io.zeebe.engine.processor.workflow;
 
+import io.atomix.core.Atomix;
 import io.zeebe.engine.processor.ProcessingContext;
 import io.zeebe.engine.processor.TypedRecordProcessors;
 import io.zeebe.engine.processor.workflow.deployment.DeploymentCreatedProcessor;
@@ -42,7 +43,8 @@ public class EngineProcessors {
       ProcessingContext processingContext,
       int partitionsCount,
       SubscriptionCommandSender subscriptionCommandSender,
-      DeploymentDistributor deploymentDistributor) {
+      DeploymentDistributor deploymentDistributor,
+      Atomix atomix) {
 
     final TypedRecordProcessors typedRecordProcessors = TypedRecordProcessors.processors();
     final LogStream stream = processingContext.getLogStream();
@@ -56,7 +58,7 @@ public class EngineProcessors {
         new CatchEventBehavior(zeebeState, subscriptionCommandSender, partitionsCount);
 
     addDeploymentRelatedProcessorAndServices(
-        catchEventBehavior, partitionId, zeebeState, typedRecordProcessors);
+        catchEventBehavior, partitionId, zeebeState, typedRecordProcessors, atomix);
     addMessageProcessors(subscriptionCommandSender, zeebeState, typedRecordProcessors);
 
     final BpmnStepProcessor stepProcessor =
@@ -102,14 +104,16 @@ public class EngineProcessors {
       CatchEventBehavior catchEventBehavior,
       int partitionId,
       ZeebeState zeebeState,
-      TypedRecordProcessors typedRecordProcessors) {
+      TypedRecordProcessors typedRecordProcessors,
+      Atomix atomix) {
     final WorkflowState workflowState = zeebeState.getWorkflowState();
     final boolean isDeploymentPartition = partitionId == Protocol.DEPLOYMENT_PARTITION;
     if (isDeploymentPartition) {
       DeploymentEventProcessors.addTransformingDeploymentProcessor(
           typedRecordProcessors, zeebeState, catchEventBehavior);
     } else {
-      DeploymentEventProcessors.addDeploymentCreateProcessor(typedRecordProcessors, workflowState);
+      DeploymentEventProcessors.addDeploymentCreateProcessor(
+          typedRecordProcessors, workflowState, atomix, partitionId);
     }
 
     typedRecordProcessors.onEvent(

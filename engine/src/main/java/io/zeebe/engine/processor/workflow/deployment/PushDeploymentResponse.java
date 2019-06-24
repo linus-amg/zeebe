@@ -1,5 +1,5 @@
 /*
- * Zeebe Broker Core
+ * Zeebe Workflow Engine
  * Copyright © 2017 camunda services GmbH (info@camunda.com)
  *
  * This program is free software: you can redistribute it and/or modify
@@ -15,11 +15,8 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-package io.zeebe.broker.system.management.deployment;
+package io.zeebe.engine.processor.workflow.deployment;
 
-import io.zeebe.clustering.management.PushDeploymentRequestEncoder;
-import io.zeebe.clustering.management.PushDeploymentResponseDecoder;
-import io.zeebe.clustering.management.PushDeploymentResponseEncoder;
 import io.zeebe.engine.util.SbeBufferWriterReader;
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
@@ -80,6 +77,6 @@ public class PushDeploymentResponse
     super.reset();
 
     partitionId = PushDeploymentResponseEncoder.partitionIdNullValue();
-    deploymentKey = PushDeploymentRequestEncoder.deploymentKeyNullValue();
+    deploymentKey = PushDeploymentResponseEncoder.deploymentKeyNullValue();
   }
 }

@@ -60,6 +60,18 @@
 
     <dependency>
       <groupId>io.zeebe</groupId>
+      <artifactId>atomix</artifactId>
+      <version>3.2.0-alpha1</version>
+    </dependency>
+
+    <dependency>
+      <groupId>io.zeebe</groupId>
+      <artifactId>atomix-cluster</artifactId>
+      <version>3.2.0-alpha1</version>
+    </dependency>
+
+    <dependency>
+      <groupId>io.zeebe</groupId>
       <artifactId>zeebe-protocol-impl</artifactId>
     </dependency>
 
@@ -204,6 +216,7 @@
           <mainClass>uk.co.real_logic.sbe.SbeTool</mainClass>
           <arguments>
             <argument>${project.build.resources[0].directory}/subscription-schema.xml</argument>
+            <argument>${project.build.resources[0].directory}/management-schema.xml</argument>
           </arguments>
           <workingDirectory>${project.build.directory}/generated-sources</workingDirectory>
           <!-- system properties defined in zeebe-parent -->

@@ -25,7 +25,7 @@ import io.zeebe.broker.clustering.base.topology.TopologyPartitionListenerImpl;
 import io.zeebe.broker.system.configuration.ClusterCfg;
 import io.zeebe.broker.system.management.deployment.NotLeaderResponse;
 import io.zeebe.broker.system.management.deployment.PushDeploymentRequest;
-import io.zeebe.broker.system.management.deployment.PushDeploymentResponse;
+import io.zeebe.engine.processor.workflow.deployment.PushDeploymentResponse;
 import io.zeebe.engine.processor.workflow.deployment.distribute.DeploymentDistributor;
 import io.zeebe.engine.processor.workflow.deployment.distribute.PendingDeploymentDistribution;
 import io.zeebe.engine.state.deployment.DeploymentsState;
@@ -34,8 +34,11 @@ import io.zeebe.util.sched.ActorControl;
 import io.zeebe.util.sched.future.ActorFuture;
 import io.zeebe.util.sched.future.CompletableActorFuture;
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.agrona.DirectBuffer;
 import org.agrona.collections.Int2ObjectHashMap;
 import org.agrona.collections.IntArrayList;
@@ -63,6 +66,7 @@ public class DeploymentDistributorImpl implements DeploymentDistributor {
 
   private final IntArrayList partitionsToDistributeTo;
   private final Atomix atomix;
+  private final Map<String, AtomicBoolean> deploymentResponses = new HashMap<>();
 
   public DeploymentDistributorImpl(
       final ClusterCfg clusterCfg,
@@ -162,18 +166,33 @@ public class DeploymentDistributorImpl implements DeploymentDistributor {
   private void pushDeploymentToPartition(final int partitionLeaderId, final int partition) {
     pushDeploymentRequest.partitionId(partition);
     final byte[] bytes = pushDeploymentRequest.toBytes();
-
     final MemberId memberId = new MemberId(Integer.toString(partitionLeaderId));
+    final String topic =
+        String.format(
+            "deployment-response-%d-%d", partition, pushDeploymentRequest.deploymentKey());
+    final AtomicBoolean responseArrived = getResponseFlag(topic);
+
+    createResponseSubscription(partitionLeaderId, partition, topic, responseArrived);
     final CompletableFuture<byte[]> pushDeploymentFuture =
         atomix.getCommunicationService().send("deployment", bytes, memberId, PUSH_REQUEST_TIMEOUT);
+
+    actor.runDelayed(
+        PUSH_REQUEST_TIMEOUT,
+        () -> {
+          if (!responseArrived.get()) {
+            LOG.warn(
+                "Failed to receive deployment response for partition {} (topic '{}'). Retrying",
+                partition,
+                topic);
+            handleRetry(partitionLeaderId, partition);
+          }
+        });
 
     pushDeploymentFuture.whenComplete(
         (response, throwable) ->
             actor.call(
                 () -> {
-                  if (throwable == null) {
-                    handleResponse(response, partitionLeaderId, partition);
-                  } else {
+                  if (throwable != null) {
                     LOG.warn(
                         "Failed to push deployment to node {} for partition {}",
                         partitionLeaderId,
@@ -182,6 +201,33 @@ public class DeploymentDistributorImpl implements DeploymentDistributor {
                     handleRetry(partitionLeaderId, partition);
                   }
                 }));
+  }
+
+  private void createResponseSubscription(
+      final int partitionLeaderId,
+      final int partition,
+      final String topic,
+      final AtomicBoolean responseArrived) {
+    if (atomix.getEventService().getSubscriptions(topic).isEmpty()) {
+      LOG.debug("Setting up subscription for topic {}", topic);
+      atomix
+          .getEventService()
+          .subscribe(
+              topic,
+              (byte[] response) -> {
+                LOG.debug(
+                    "Receiving deployment response on topic {} from partition {}",
+                    topic,
+                    partition);
+
+                handleResponse(response, partitionLeaderId, partition);
+                responseArrived.set(true);
+
+                final CompletableFuture future = new CompletableFuture();
+                future.complete(null);
+                return future;
+              });
+    }
   }
 
   private void handleResponse(byte[] response, int partitionLeaderId, int partition) {
@@ -207,7 +253,9 @@ public class DeploymentDistributorImpl implements DeploymentDistributor {
 
   private void handleRetry(int partitionLeaderId, int partition) {
     LOG.debug(
-        "Retry deployment to push to partition {} after {}ms", partition, RETRY_DELAY.toMillis());
+        "Retry deployment to push to partition {} after {}ms",
+        partition,
+        PUSH_REQUEST_TIMEOUT.toMillis());
     actor.runDelayed(
         RETRY_DELAY,
         () -> {
@@ -236,5 +284,12 @@ public class DeploymentDistributorImpl implements DeploymentDistributor {
           "Deployment was pushed to partition {} successfully.",
           pushDeploymentResponse.partitionId());
     }
+  }
+
+  private AtomicBoolean getResponseFlag(final String topic) {
+    final AtomicBoolean responseArrived =
+        deploymentResponses.getOrDefault(topic, new AtomicBoolean(false));
+    deploymentResponses.putIfAbsent(topic, responseArrived);
+    return responseArrived;
   }
 }

@@ -19,6 +19,7 @@ package io.zeebe.engine.processor.workflow.deployment;
 
 import static io.zeebe.protocol.record.intent.DeploymentIntent.CREATE;
 
+import io.atomix.core.Atomix;
 import io.zeebe.engine.processor.TypedRecordProcessors;
 import io.zeebe.engine.processor.workflow.CatchEventBehavior;
 import io.zeebe.engine.state.ZeebeState;
@@ -28,9 +29,14 @@ import io.zeebe.protocol.record.ValueType;
 public class DeploymentEventProcessors {
 
   public static void addDeploymentCreateProcessor(
-      TypedRecordProcessors typedRecordProcessors, WorkflowState workflowState) {
+      TypedRecordProcessors typedRecordProcessors,
+      WorkflowState workflowState,
+      Atomix atomix,
+      final int partitionId) {
     typedRecordProcessors.onCommand(
-        ValueType.DEPLOYMENT, CREATE, new DeploymentCreateProcessor(workflowState));
+        ValueType.DEPLOYMENT,
+        CREATE,
+        new DeploymentCreateProcessor(workflowState, atomix, partitionId));
   }
 
   public static void addTransformingDeploymentProcessor(

@@ -17,6 +17,8 @@
  */
 package io.zeebe.engine.processor.workflow.deployment;
 
+import io.atomix.core.Atomix;
+import io.zeebe.engine.Loggers;
 import io.zeebe.engine.processor.TypedRecord;
 import io.zeebe.engine.processor.TypedRecordProcessor;
 import io.zeebe.engine.processor.TypedResponseWriter;
@@ -31,9 +33,14 @@ public class DeploymentCreateProcessor implements TypedRecordProcessor<Deploymen
       "Expected to create a new deployment with key '%d', but there is already an existing deployment with that key";
 
   private final WorkflowState workflowState;
+  private final Atomix atomix;
+  private final int partitionId;
 
-  public DeploymentCreateProcessor(final WorkflowState workflowState) {
+  public DeploymentCreateProcessor(
+      final WorkflowState workflowState, final Atomix atomix, final int partitionId) {
     this.workflowState = workflowState;
+    this.atomix = atomix;
+    this.partitionId = partitionId;
   }
 
   @Override
@@ -51,5 +58,12 @@ public class DeploymentCreateProcessor implements TypedRecordProcessor<Deploymen
           RejectionType.ALREADY_EXISTS,
           String.format(DEPLOYMENT_ALREADY_EXISTS_MESSAGE, event.getKey()));
     }
+
+    final PushDeploymentResponse response =
+        new PushDeploymentResponse().deploymentKey(event.getKey()).partitionId(partitionId);
+    final String topic = String.format("deployment-response-%d-%d", partitionId, event.getKey());
+
+    atomix.getEventService().broadcast(topic, response.toBytes());
+    Loggers.WORKFLOW_PROCESSOR_LOGGER.debug("Send deployment response on topic {}", topic);
   }
 }

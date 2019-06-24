@@ -21,6 +21,8 @@ import static io.zeebe.test.util.record.RecordingExporter.jobRecords;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import io.atomix.cluster.messaging.ClusterEventService;
+import io.atomix.core.Atomix;
 import io.zeebe.engine.processor.CopiedRecords;
 import io.zeebe.engine.processor.ReadonlyProcessingContext;
 import io.zeebe.engine.processor.StreamProcessorLifecycleAware;
@@ -111,18 +113,23 @@ public class EngineRule extends ExternalResource {
         mock(PendingDeploymentDistribution.class);
     when(deploymentDistribution.getDeployment()).thenReturn(deploymentBuffer);
 
+    final Atomix atomix = mock(Atomix.class);
+    final ClusterEventService eventService = mock(ClusterEventService.class);
+    when(atomix.getEventService()).thenReturn(eventService);
+
     forEachPartition(
-        partitonId -> {
-          final int currentPartitionId = partitonId;
+        partitionId -> {
+          final int currentPartitionId = partitionId;
           environmentRule.startTypedStreamProcessor(
-              partitonId,
+              partitionId,
               (processingContext) ->
                   EngineProcessors.createEngineProcessors(
                           processingContext,
                           partitionCount,
                           new SubscriptionCommandSender(
                               currentPartitionId, new PartitionCommandSenderImpl()),
-                          new DeploymentDistributionImpl())
+                          new DeploymentDistributionImpl(),
+                          atomix)
                       .withListener(new ProcessingExporterTransistor()));
         });
   }

@@ -19,7 +19,11 @@ package io.zeebe.engine.processor.workflow.deployment;
 
 import static io.zeebe.test.util.TestUtil.waitUntil;
 import static io.zeebe.util.buffer.BufferUtil.wrapString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
+import io.atomix.cluster.messaging.ClusterEventService;
+import io.atomix.core.Atomix;
 import io.zeebe.engine.state.deployment.WorkflowState;
 import io.zeebe.engine.util.StreamProcessorRule;
 import io.zeebe.model.bpmn.Bpmn;
@@ -50,12 +54,16 @@ public class DeploymentCreatedProcessorTest {
 
   @Before
   public void setUp() {
+    final Atomix atomix = mock(Atomix.class);
+    final ClusterEventService eventService = mock(ClusterEventService.class);
+    when(atomix.getEventService()).thenReturn(eventService);
+
     rule.startTypedStreamProcessor(
         (typedRecordProcessors, zeebeState) -> {
           workflowState = zeebeState.getWorkflowState();
 
           DeploymentEventProcessors.addDeploymentCreateProcessor(
-              typedRecordProcessors, workflowState);
+              typedRecordProcessors, workflowState, atomix, Protocol.DEPLOYMENT_PARTITION + 1);
           typedRecordProcessors.onEvent(
               ValueType.DEPLOYMENT,
               DeploymentIntent.CREATED,
